@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AttendEase — Attendance & Exam Eligibility Portal</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M9 17l4 4 10-11' stroke='white' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="pub-nav">
+  <div class="container inner">
+    <a class="logo" href="index.html"><span class="mark">A</span> AttendEase</a>
+    <div class="links">
+      <a href="#rules">Exam Rules</a>
+      <a href="#how">How it works</a>
+      <a href="#faq">FAQ</a>
+      <a class="hide-sm btn btn-ghost btn-sm" href="admin.html">Admin login</a>
+      <a class="btn btn-primary btn-sm" href="check.html">Check attendance</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="container hero-grid">
+    <div>
+      <span class="eyebrow">🎓 Attendance &amp; Exam Eligibility System</span>
+      <h1>Know if you're <span class="grad">exam&nbsp;eligible</span> — before it's too late.</h1>
+      <p class="lead">
+        Type your roll number and instantly see your attendance in every subject,
+        how far you are from the <b>75% exam rule</b>, and exactly how many classes
+        you can still miss. No login. No waiting for the notice board.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="check.html">Check my attendance →</a>
+        <a class="btn btn-ghost" href="#rules">How the 75% rule works</a>
+      </div>
+      <p class="trust">Used by the exam cell to publish eligibility lists · Students never need an account</p>
+    </div>
+
+    <div class="card mock">
+      <div class="mock-head">
+        <div class="who"><b>Ahmed Raza</b><span>2022-CS-001 · Semester 7</span></div>
+        <span class="badge b-ok">Eligible</span>
+      </div>
+      <div class="mock-row">
+        <div><span class="m-name">Discrete Mathematics</span><div class="m-track"><i style="width:95.8%;background:var(--ok)"></i></div></div>
+        <span class="m-pct pct-ok">95.8%</span>
+      </div>
+      <div class="mock-row">
+        <div><span class="m-name">Data Structures</span><div class="m-track"><i style="width:77.3%;background:var(--ok)"></i></div></div>
+        <span class="m-pct pct-ok">77.3%</span>
+      </div>
+      <div class="mock-row">
+        <div><span class="m-name">Database Systems</span><div class="m-track"><i style="width:70.8%;background:var(--warn)"></i></div></div>
+        <span class="m-pct pct-warn">70.8%</span>
+      </div>
+      <div class="mock-verdict"><span>✓ Final exam eligibility</span><span>92.1% overall</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ LIVE STATS ============ -->
+<div class="section" style="padding:10px 0 30px">
+  <div class="container stat-grid">
+    <div class="card stat"><div class="s-label">Students tracked</div><div class="s-value" id="stat-students">—</div><div class="s-sub">in this semester</div></div>
+    <div class="card stat"><div class="s-label">Classes recorded</div><div class="s-value" id="stat-classes">—</div><div class="s-sub">across all subjects</div></div>
+    <div class="card stat"><div class="s-label">Average attendance</div><div class="s-value" id="stat-avg">—</div><div class="s-sub">this semester</div></div>
+    <div class="card stat"><div class="s-label">Exam eligible</div><div class="s-value" id="stat-eligible">—</div><div class="s-sub">meeting the 75% rule in every subject</div></div>
+  </div>
+</div>
+
+<!-- ============ RULES ============ -->
+<section class="section alt" id="rules">
+  <div class="container">
+    <div class="sec-head">
+      <div class="kicker">University exam regulations</div>
+      <h2>The 75% attendance rule, in plain words</h2>
+      <p>The standard rule followed by universities: you must attend at least 75% of classes
+         in <b>every single subject</b> to be allowed to sit the final exam.</p>
+    </div>
+    <div class="grid-3">
+      <div class="card rule-card">
+        <div class="rc-range" style="color:var(--ok-deep)">75% – 100%</div>
+        <h3>✅ Exam eligible</h3>
+        <p>You meet the minimum attendance requirement in the subject. Sit back — but keep an eye on your buffer: the portal tells you exactly how many classes you can still miss.</p>
+      </div>
+      <div class="card rule-card warn">
+        <div class="rc-range" style="color:var(--warn-deep)">65% – 74.9%</div>
+        <h3>⚠️ At risk — condonation case</h3>
+        <p>Below the requirement but within the condonation window. Your name goes to the attendance committee, which may allow you to sit the exam for valid reasons (medical, university duty) — at its discretion.</p>
+      </div>
+      <div class="card rule-card bad">
+        <div class="rc-range" style="color:var(--bad-deep)">Below 65%</div>
+        <h3>⛔ Not eligible — detained</h3>
+        <p>As per university rules you are detained from the exam in that subject. Meet your academic advisor immediately; the portal shows exactly how many classes in a row you must attend to recover.</p>
+      </div>
+    </div>
+    <p style="text-align:center;color:var(--faint);font-size:12.5px;margin-top:18px">
+      Thresholds (75% / 65%) are configured by the exam cell and can differ per university.
+    </p>
+  </div>
+</section>
+
+<!-- ============ HOW IT WORKS ============ -->
+<section class="section" id="how">
+  <div class="container">
+    <div class="sec-head">
+      <div class="kicker">For students</div>
+      <h2>Three steps. Zero logins.</h2>
+      <p>Attendance is public inside your university — just like the notice board — so there is nothing to sign up for and nothing to forget.</p>
+    </div>
+    <div class="grid-3">
+      <div class="card step">
+        <div class="n">1</div>
+        <h3>Open the check page</h3>
+        <p>Works on any phone or lab computer. No account, no password, no OTP.</p>
+      </div>
+      <div class="card step">
+        <div class="n">2</div>
+        <h3>Type your roll number</h3>
+        <p>That's your identity here — the same one on your ID card and the notice board.</p>
+      </div>
+      <div class="card step">
+        <div class="n">3</div>
+        <h3>See every subject &amp; your verdict</h3>
+        <p>Per-subject percentage, eligibility status, your safety buffer — and a printable summary to take to the exam cell if something looks wrong.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOR ADMIN ============ -->
+<section class="section alt">
+  <div class="container">
+    <div class="sec-head">
+      <div class="kicker">For the exam cell</div>
+      <h2>One admin account runs everything</h2>
+      <p>A single dashboard for the whole semester — no user management, no roles to juggle.</p>
+    </div>
+    <div class="grid-3">
+      <div class="card feat">
+        <div class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+        <div><h3>Daily marking in seconds</h3><p>Pick subject + date, tap present/absent per student, save. Re-marking a day simply updates it.</p></div>
+      </div>
+      <div class="card feat">
+        <div class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div><h3>Live eligibility lists</h3><p>Eligible / at-risk / detained counts update the moment attendance is saved. Watchlist surfaces the students closest to losing eligibility.</p></div>
+      </div>
+      <div class="card feat">
+        <div class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+        <div><h3>CSV &amp; printable reports</h3><p>Export the full eligibility matrix for record-keeping, or print the defaulter list for the committee.</p></div>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:26px">
+      <a class="btn btn-primary" href="admin.html">Go to admin dashboard</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section" id="faq">
+  <div class="container">
+    <div class="sec-head">
+      <div class="kicker">Questions students actually ask</div>
+      <h2>FAQ</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Do I need an account or password?</summary>
+        <p>No. Your roll number is already public within the university (it's on the notice board), so the portal uses it directly. Nothing beyond your name, roll number and attendance is ever shown.</p>
+      </details>
+      <details>
+        <summary>Can other people see my attendance?</summary>
+        <p>Yes — the same people who could read the notice board. The exam cell can switch off public checking entirely from the admin settings if policy changes.</p>
+      </details>
+      <details>
+        <summary>The percentage looks wrong. What do I do?</summary>
+        <p>Print your report (button on the check page) and take it to the exam cell or your teacher. Only the admin can change attendance records — students can never edit anything.</p>
+      </details>
+      <details>
+        <summary>What does "condonation" mean?</summary>
+        <p>If you land between 65% and 75%, you are not automatically barred. The attendance committee reviews your reason (medical, sports, university duty) and can condone the shortage. Below 65% there is no condonation.</p>
+      </details>
+      <details>
+        <summary>Is this real university software?</summary>
+        <p>It's a course-project demo with sample data. The rules it applies (75% pass mark, 65% condonation floor) mirror standard university ordinances, and all data is managed by one admin account.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container inner">
+    <span>© 2026 AttendEase — Attendance &amp; Exam Eligibility Portal · course project, demo data</span>
+    <div class="links">
+      <a href="check.html">Check attendance</a>
+      <a href="admin.html">Admin login</a>
+    </div>
+  </div>
+</footer>
+
+<script src="js/db.js"></script>
+<script src="js/home.js"></script>
+</body>
+</html>

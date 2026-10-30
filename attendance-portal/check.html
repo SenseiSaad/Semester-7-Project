@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check Attendance — AttendEase</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M9 17l4 4 10-11' stroke='white' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="pub-nav no-print">
+  <div class="container inner">
+    <a class="logo" href="index.html"><span class="mark">A</span> AttendEase</a>
+    <div class="links">
+      <a href="index.html#rules">Exam rules</a>
+      <a href="index.html#faq">FAQ</a>
+      <a class="btn btn-ghost btn-sm" href="admin.html">Admin</a>
+    </div>
+  </div>
+</nav>
+
+<main class="check-wrap">
+  <div class="card check-card no-print" id="lookup-card">
+    <h1>Check your attendance</h1>
+    <p class="sub">No login needed — just enter the roll number printed on your ID card.</p>
+    <div id="check-disabled" class="banner warn hidden">
+      ⚠️ Online checking is currently <b>disabled by the exam cell</b>.
+      Please contact the admin office or check the department notice board.
+    </div>
+    <form id="check-form" class="lookup-row" autocomplete="off">
+      <input class="input" id="roll-input" list="roll-list" name="roll"
+             placeholder="e.g. 2022-CS-001" maxlength="24" aria-label="Roll number">
+      <datalist id="roll-list"></datalist>
+      <button class="btn btn-primary" type="submit">Check</button>
+    </form>
+    <div class="error-text hidden" id="check-error" role="alert"></div>
+    <p class="hint" style="margin-top:14px">
+      Try the demo roll <span class="roll-chip">2022-CS-001</span> (top of the class) or
+      <span class="roll-chip">2022-CS-012</span> (a detained student) to see both verdicts.
+    </p>
+  </div>
+
+  <div id="result" class="print-area" style="margin-top:22px"></div>
+</main>
+
+<div id="toast-root"></div>
+
+<script src="js/db.js"></script>
+<script src="js/check.js"></script>
+</body>
+</html>
