@@ -2,62 +2,74 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth, homeFor } from '../auth'
 import { Logo } from '../Layout'
-import { errMsg } from '../api'
+import ThemeToggle from '../ThemeToggle'
 
 export default function Login() {
-  const { login, user } = useAuth()
+  const { login } = useAuth()
   const nav = useNavigate()
   const [params] = useSearchParams()
+  const [role, setRole] = useState(params.get('role') === 'student' ? 'student' : 'teacher')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-
-  if (user) { nav(homeFor(user)); }
 
   async function submit(e) {
     e.preventDefault()
     setError('')
     setBusy(true)
     try {
-      const u = await login(email.trim(), password)
+      const u = login(email.trim(), password, role)
       const next = params.get('next')
       nav(next ? decodeURIComponent(next) : homeFor(u), { replace: true })
     } catch (err) {
-      setError(errMsg(err))
+      setError(err.message)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div className="neo-bg grid min-h-screen place-items-center px-4 py-10">
-      <div className="neo-card w-full max-w-sm p-9">
-        <div className="mb-7 flex justify-center"><Logo /></div>
-        <h1 className="text-center font-display text-xl font-bold">Welcome back</h1>
-        <p className="mt-1 text-center text-[13px] text-slate-400">
-          Teachers and students sign in here.
-        </p>
-        <form onSubmit={submit} className="mt-7 space-y-4">
-          <input className="neo-input" type="email" required placeholder="Email"
-            autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input className="neo-input" type="password" required placeholder="Password"
-            autoComplete="current-password" value={password}
-            onChange={(e) => setPassword(e.target.value)} />
-          {error && <div className="alert alert-error !mb-0">{error}</div>}
-          <button className="neo-btn-dark" disabled={busy}>
-            {busy ? 'Signing in…' : 'Log in'}
-          </button>
-        </form>
-        <div className="my-5 flex items-center gap-3 text-xs font-semibold text-slate-400">
-          <span className="h-px flex-1 bg-slate-300/70" />or<span className="h-px flex-1 bg-slate-300/70" />
+    <div className="dark-section grid min-h-screen place-items-center px-4 py-10">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex items-center justify-between">
+          <Logo dark />
+          <ThemeToggle dark />
         </div>
-        <Link to="/signup" className="neo-btn block text-center no-underline">
-          Sign up with claim code
-        </Link>
-        <p className="mt-6 text-center text-[12px] text-slate-400">
-          Demo — teacher: <code className="font-semibold text-ink">teacher@uni.edu / teach1234</code><br />
-          student: <code className="font-semibold text-ink">2022-cs-001@uni.edu / study1234</code>
+        <div className="rounded-3xl border border-lineDark bg-panel p-8">
+          <h1 className="text-center font-display text-2xl tracking-wide text-paper">Sign in</h1>
+          <p className="mt-1 text-center text-[13px] text-taupe">Pick your role, then sign in.</p>
+
+          {/* role toggle */}
+          <div className="mt-6 grid grid-cols-2 gap-1 rounded-full border border-lineDark bg-coal p-1">
+            {['teacher', 'student'].map((r) => (
+              <button key={r} type="button" onClick={() => setRole(r)}
+                className={`rounded-full py-2 text-[13px] font-semibold capitalize transition ${
+                  role === r ? 'bg-primary text-onprimary' : 'text-taupe hover:text-paper'}`}>
+                {r}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <input className="dark-input" type="email" required placeholder="Email"
+              autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input className="dark-input" type="password" required placeholder="Password"
+              autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            {error && <div className="rounded-xl border border-[var(--bad)] bg-[#2A1B16] px-4 py-3 text-sm text-[#E0A192]">{error}</div>}
+            <button className="btn btn-paper w-full" disabled={busy}>
+              {busy ? 'Signing in…' : `Log in as ${role}`}
+            </button>
+          </form>
+
+          <div className="mt-6 rounded-xl border border-lineDark bg-coal px-4 py-3 text-center text-[12px] text-taupe">
+            {role === 'teacher'
+              ? <>Demo teacher — <span className="text-paper">teacher@uni.edu / teach1234</span></>
+              : <>Demo student — <span className="text-paper">2022-cs-001@uni.edu / study1234</span><br />Accounts are created by the teacher, there is no self-signup.</>}
+          </div>
+        </div>
+        <p className="mt-6 text-center text-[13px] text-taupe">
+          <Link to="/" className="hover:text-paper">← Back to the overview</Link>
         </p>
       </div>
     </div>

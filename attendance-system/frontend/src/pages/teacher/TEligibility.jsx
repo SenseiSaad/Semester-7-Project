@@ -1,109 +1,107 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, errMsg } from '../../api'
-import { PageHead, Spinner, Badge, Progress, Empty } from '../../ui'
-
-const FILTERS = [
-  ['', 'All students'],
-  ['eligible', 'Eligible'],
-  ['at_risk', 'At risk'],
-  ['not_eligible', 'Not eligible'],
-]
+import { useDB } from '../../auth'
+import { PageHead, Badge, Progress, Empty } from '../../ui'
+import { eligibilityStats, exportEligibilityCSV, courseOf } from '../../logic/eligibility.js'
 
 export default function TEligibility() {
   const [params, setParams] = useSearchParams()
   const courseId = params.get('course') || ''
   const status = params.get('status') || ''
-  const q = params.get('q') || ''
+  const q = (params.get('q') || '').toLowerCase()
+  const db = useDB()
 
-  const [courses, setCourses] = useState(null)
-  const [data, setData] = useState(null)
-  const [error, setError] = useState('')
+  const course = courseId ? courseOf(db, courseId) : null
+  const stats = courseId ? eligibilityStats(db, courseId) : null
 
-  useEffect(() => {
-    api.get('/courses/').then((r) => {
-      setCourses(r.data)
-      if (!courseId && r.data[0]) setParams({ course: String(r.data[0].id) }, { replace: true })
-    })
-  }, []) // eslint-disable-line
-
-  useEffect(() => {
-    if (!courseId) return
-    setData(null)
-    api.get(`/courses/${courseId}/eligibility/`, { params: { status, q } })
-      .then((r) => setData(r.data))
-      .catch((e) => setError(errMsg(e)))
-  }, [courseId, status, q]) // eslint-disable-line
-
-  async function exportCsv() {
-    const res = await api.get(`/courses/${courseId}/eligibility/`,
-      { params: { status, q, format: 'csv' }, responseType: 'blob' })
-    const url = URL.createObjectURL(res.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${data?.course?.code || 'course'}-eligibility.csv`
-    document.body.appendChild(a); a.click(); a.remove()
-    URL.revokeObjectURL(url)
+  if (!db.courses.length) {
+    return (
+      <div>
+        <PageHead title="Eligibility report" />
+        <div className="card"><Empty title="No courses yet" sub="Create a course first." /></div>
+      </div>
+    )
   }
 
-  if (!courses) return <Spinner />
+  const activeCourse = course || db.courses[0]
+  const activeStats = courseId === activeCourse.id ? stats : eligibilityStats(db, activeCourse.id)
+
+  function download() {
+    const { filename, text } = exportEligibilityCSV(db, activeCourse.id)
+    const blob = new Blob([text], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = filename
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(a.href)
+  }
+
+  function set(next) { setParams({ course: activeCourse.id, ...next }) }
+
+  const chips = [
+    ['', 'All', activeStats.rows.length],
+    ['eligible', 'Eligible', activeStats.eligible],
+    ['not_eligible', 'Not eligible', activeStats.notEligible],
+  ]
+
+  const rows = activeStats.rows
+    .filter((r) => !status || (status === 'eligible' ? r.eligible : !r.eligible))
+    .filter((r) => !q || r.name.toLowerCase().includes(q) || r.rollNo.toLowerCase().includes(q))
 
   return (
     <div>
-      <PageHead title="Eligibility report" sub="Live exam eligibility per course">
-        <button className="btn-dark btn-sm" onClick={exportCsv} disabled={!data}>Export CSV</button>
+      <PageHead title="Eligibility report" sub={`Percentage = present ÷ sessions held · threshold ≥${activeCourse.eligibilityThreshold}%`}>
+        <button className="btn btn-dark btn-sm" onClick={download}>Export CSV</button>
       </PageHead>
 
-      <div className="mb-5 flex flex-wrap gap-3">
-        <select className="input max-w-xs" value={courseId}
-          onChange={(e) => setParams({ course: e.target.value, status, q })}>
-          {courses.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <select className="input max-w-xs" value={activeCourse.id}
+          onChange={(e) => set({ course: e.target.value })}>
+          {db.courses.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
         </select>
-        <select className="input max-w-[180px]" value={status}
-          onChange={(e) => setParams({ course: courseId, status: e.target.value, q })}>
-          {FILTERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <input className="input max-w-[220px]" placeholder="Search name or ID…" value={q}
-          onChange={(e) => setParams({ course: courseId, status, q: e.target.value })} />
+        <input className="input max-w-[220px]" placeholder="Search name or roll no…" value={q}
+          onChange={(e) => set({ q: e.target.value })} />
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      <div className="mb-5 flex flex-wrap gap-2">
+        {chips.map(([v, label, count]) => (
+          <button key={v || 'all'}
+            onClick={() => set({ status: v })}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-bold transition ${
+              status === v ? 'border-strong bg-primary text-paper' : 'border-line bg-surface text-ink hover:border-strong'}`}>
+            {label}
+            <span className={`rounded-full px-1.5 text-[11px] ${status === v ? 'opacity-70' : 'bg-surface2 text-stone'}`}>{count}</span>
+          </button>
+        ))}
+      </div>
 
-      {!data ? <Spinner /> : (
-        <div className="card overflow-x-auto">
-          <div className="px-5 pt-4 text-[13px] text-slate-400">
-            {data.course.code} · threshold ≥{data.threshold}% · {data.rows.length} students
-          </div>
-          <table className="table mt-2">
-            <thead>
-              <tr><th>Student</th><th>Present / held</th><th style={{ minWidth: 180 }}>Attendance</th>
-                <th>Classes needed</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              {data.rows.map((r) => (
-                <tr key={r.enrollment_id}>
-                  <td><b>{r.name}</b><div className="text-xs text-slate-400">{r.student_id}</div></td>
-                  <td className="whitespace-nowrap font-semibold">{r.present} / {r.held}</td>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <Progress pct={r.percentage} status={r.status} />
-                      <b className="w-14 text-right">{r.percentage == null ? '—' : r.percentage.toFixed(1) + '%'}</b>
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap text-[13px] text-slate-500">
-                    {r.status === 'eligible'
-                      ? (r.can_miss > 0 ? `can miss ${r.can_miss}` : 'on the line')
-                      : r.status === 'no_data' ? '—'
-                      : `attend ${r.classes_needed} in a row`}
-                  </td>
-                  <td><Badge v={r.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {data.rows.length === 0 && <Empty title="Nobody matches this filter" />}
+      <div className="card overflow-x-auto">
+        <div className="px-5 pt-4 text-[13px] text-stone">
+          {activeCourse.code} · {activeStats.rows.length} students · {activeCourse.totalClasses ? `planned ${activeCourse.totalClasses} classes` : 'no plan set'}
         </div>
-      )}
+        <table className="table mt-2">
+          <thead>
+            <tr><th>Student</th><th>Present / held</th><th style={{ minWidth: 170 }}>Percentage</th><th>Missed</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.studentId}>
+                <td><b>{r.name}</b><div className="text-xs text-stone">{r.rollNo}</div></td>
+                <td className="whitespace-nowrap font-semibold">{r.present} / {r.held}</td>
+                <td>
+                  <div className="flex items-center gap-3">
+                    <Progress pct={r.percentage} ok={r.eligible} />
+                    <b className="w-14 text-right">{r.percentage == null ? '—' : r.percentage.toFixed(1) + '%'}</b>
+                  </div>
+                </td>
+                <td className="font-semibold">{r.missedClasses}</td>
+                <td><Badge v={r.eligible ? 'eligible' : 'not_eligible'} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <Empty title="Nobody matches this filter" />}
+      </div>
     </div>
   )
 }

@@ -67,7 +67,7 @@ export default function Attend() {
     }
   }, [user, code]) // eslint-disable-line
 
-  if (loading || !user) return <div className="neo-bg grid min-h-screen place-items-center text-sm font-semibold text-slate-400">Loading…</div>
+  if (loading || !user) return <div className="neo-bg grid min-h-screen place-items-center text-sm font-semibold text-stone">Loading…</div>
 
   const back = homeFor(user)
 
@@ -78,7 +78,7 @@ export default function Attend() {
 
         <div className="neo-card p-7">
           <h1 className="text-center font-display text-xl font-bold">Scan attendance</h1>
-          <p className="mt-1 text-center text-[13px] text-slate-400">
+          <p className="mt-1 text-center text-[13px] text-stone">
             {user.role === 'student'
               ? 'Point your camera at the teacher screen QR.'
               : 'Teachers do not scan — this page is for students.'}
@@ -101,9 +101,9 @@ export default function Attend() {
               {state.text}
             </div>
           )}
-          {busy && !state && <div className="mt-6 text-center text-sm font-semibold text-slate-400">Submitting…</div>}
+          {busy && !state && <div className="mt-6 text-center text-sm font-semibold text-stone">Submitting…</div>}
 
-          {!state && code && !busy && <div className="mt-6 text-center text-sm text-slate-400">Submitting code…</div>}
+          {!state && code && !busy && <div className="mt-6 text-center text-sm text-stone">Submitting code…</div>}
 
           {user.role === 'student' && !user.device_registered && (
             <div className="alert alert-warn mt-4 !mb-0 text-[13px]">
@@ -123,7 +123,7 @@ export default function Attend() {
           </div>
         </div>
 
-        <p className="mt-5 text-center text-[12px] text-slate-400">
+        <p className="mt-5 text-center text-[12px] text-stone">
           One device per student · codes expire after 20s · violations are logged
         </p>
       </div>

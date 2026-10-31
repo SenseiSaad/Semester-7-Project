@@ -4,6 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App'
 import { AuthProvider } from './auth'
+import { registerSeed } from './logic/storage.js'
+import { buildSeed } from './logic/seed.js'
+
+registerSeed(buildSeed)
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -4,8 +4,7 @@ import { Spinner } from './ui'
 import Layout from './Layout'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
-import Signup from './pages/Signup'
-import Attend from './pages/Attend'
+import Scan from './pages/Scan'
 import TDashboard from './pages/teacher/TDashboard'
 import TCourses from './pages/teacher/TCourses'
 import TCourseDetail from './pages/teacher/TCourseDetail'
@@ -15,12 +14,11 @@ import TViolations from './pages/teacher/TViolations'
 import TEligibility from './pages/teacher/TEligibility'
 import SDashboard from './pages/student/SDashboard'
 import SHistory from './pages/student/SHistory'
-import SNotifications from './pages/student/SNotifications'
+import SAlerts from './pages/student/SAlerts'
 
 function Gate({ role, children }) {
-  const { user, loading } = useAuth()
+  const { user } = useAuth()
   const loc = useLocation()
-  if (loading) return <div className="grid min-h-screen place-items-center"><Spinner /></div>
   if (!user) {
     const next = encodeURIComponent(loc.pathname + loc.search)
     return <Navigate to={`/login?next=${next}`} replace />
@@ -34,9 +32,10 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
 
-      <Route path="/attend" element={<Attend />} />
+      {/* QR join link target — the student's own one-time token is looked up there */}
+      <Route path="/attend" element={<Navigate to="/scan" replace />} />
+      <Route path="/scan" element={<Scan />} />
 
       <Route path="/t" element={<Gate role="teacher"><Layout /></Gate>}>
         <Route index element={<TDashboard />} />
@@ -51,8 +50,7 @@ export default function App() {
       <Route path="/s" element={<Gate role="student"><Layout /></Gate>}>
         <Route index element={<SDashboard />} />
         <Route path="history" element={<SHistory />} />
-        <Route path="scan" element={<Attend />} />
-        <Route path="notifications" element={<SNotifications />} />
+        <Route path="alerts" element={<SAlerts />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,48 +1,36 @@
+/* auth.jsx — React bindings over the logic layer: the logged-in user lives in
+   localStorage (via logic/auth.js) and every db change notifies subscribers. */
 import { createContext, useContext, useEffect, useState } from 'react'
-import { api, getDeviceToken } from './api'
+import { getDB, subscribe, update, resetToSeed } from './logic/storage.js'
+import { verifyUser, saveSession, clearSession, currentUser } from './logic/auth.js'
 
 const AuthCtx = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(() => currentUser(getDB()))
 
-  useEffect(() => {
-    if (!localStorage.getItem('saes_access')) { setLoading(false); return }
-    api.get('/auth/me/')
-      .then((r) => setUser(r.data))
-      .catch(() => {
-        localStorage.removeItem('saes_access')
-        localStorage.removeItem('saes_refresh')
-      })
-      .finally(() => setLoading(false))
-  }, [])
+  // keep the user fresh if the db is reset under us
+  useEffect(() => subscribe(() => setUser(currentUser(getDB()))), [])
 
-  // a student's first login registers this browser as their one device
-  async function ensureDevice(u) {
-    if (u.role !== 'student' || u.device_registered) return u
-    await api.post('/devices/register/', { device_token: getDeviceToken() })
-    return { ...u, device_registered: true }
+  function login(email, password, role) {
+    const res = verifyUser(getDB(), { email, password, role })
+    if (!res.ok) throw new Error(res.error)
+    saveSession(res.user)
+    setUser(res.user)
+    return res.user
   }
 
-  async function login(email, password) {
-    const { data } = await api.post('/auth/token/', { email, password })
-    localStorage.setItem('saes_access', data.access)
-    localStorage.setItem('saes_refresh', data.refresh)
-    const me = await api.get('/auth/me/')
-    const u = await ensureDevice(me.data)
-    setUser(u)
-    return u
-  }
-
-  async function logout() {
-    localStorage.removeItem('saes_access')
-    localStorage.removeItem('saes_refresh')
+  function logout() {
+    clearSession()
     setUser(null)
   }
 
+  function resetDemo() {
+    resetToSeed()
+  }
+
   return (
-    <AuthCtx.Provider value={{ user, setUser, loading, login, logout, ensureDevice }}>
+    <AuthCtx.Provider value={{ user, setUser, login, logout, resetDemo, update }}>
       {children}
     </AuthCtx.Provider>
   )
@@ -50,3 +38,12 @@ export function AuthProvider({ children }) {
 
 export const useAuth = () => useContext(AuthCtx)
 export const homeFor = (u) => (u ? (u.role === 'teacher' ? '/t' : '/s') : '/')
+
+/* Re-renders the component on every db mutation. */
+export function useDB() {
+  const [db, setDb] = useState(getDB())
+  useEffect(() => subscribe(setDb), [])
+  return db
+}
+
+export { update }

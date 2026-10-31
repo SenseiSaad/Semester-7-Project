@@ -4,16 +4,37 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['Space Grotesk', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Marcellus', 'Georgia', 'serif'],
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
-        ink: '#101319',
-        paper: '#f6f7f9',
+        /* theme-aware (flip with .dark on <html>) */
+        page: 'var(--bg)',
+        surface: 'var(--surface)',
+        surface2: 'var(--surface2)',
+        ink: 'var(--text)',
+        stone: 'var(--muted)',
+        line: 'var(--line)',
+        strong: 'var(--line-strong)',
+        primary: 'var(--btn-bg)',
+        onprimary: 'var(--btn-text)',
+        accent: 'var(--accent)',
+        bronze: 'var(--accent)',
+        ok: 'var(--ok)',
+        warn: 'var(--warn)',
+        bad: 'var(--bad)',
+        /* fixed tokens for the dark cover sections (same in both themes) */
+        coal: '#16120D',
+        panel: '#211C15',
+        paper: '#F2EBDB',
+        taupe: '#A79C86',
+        lineDark: '#3A332A',
       },
       boxShadow: {
-        soft: '0 1px 2px rgba(16,19,25,.05), 0 10px 30px -12px rgba(16,19,25,.12)',
-        lift: '0 2px 4px rgba(16,19,25,.06), 0 18px 44px -16px rgba(16,19,25,.18)',
+        soft: '0 1px 2px var(--shadow), 0 10px 28px -14px var(--shadow)',
+      },
+      letterSpacing: {
+        widest2: '0.28em',
       },
     },
   },

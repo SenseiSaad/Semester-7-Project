@@ -1,57 +1,79 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../../api'
-import { PageHead, Spinner, Badge, Progress, Empty } from '../../ui'
+import { useAuth, useDB } from '../../auth'
+import { PageHead, Badge, Progress, Empty } from '../../ui'
+import { getStudentCourseSummary, courseOf } from '../../logic/eligibility.js'
 
 export default function SDashboard() {
-  const [courses, setCourses] = useState(null)
+  const { user } = useAuth()
+  const db = useDB()
 
-  useEffect(() => {
-    api.get('/me/summary/').then((r) => setCourses(r.data.courses))
-  }, [])
+  const courses = db.enrollments
+    .filter((e) => e.studentId === user.id)
+    .map((e) => ({ course: courseOf(db, e.courseId), summary: getStudentCourseSummary(db, user.id, e.courseId) }))
+    .filter((x) => x.course)
 
-  if (!courses) return <Spinner />
+  const withPct = courses.filter((c) => c.summary.percentage != null)
+  const overall = withPct.length ? withPct.reduce((a, c) => a + c.summary.percentage, 0) / withPct.length : null
+  const nOk = courses.filter((c) => c.summary.eligible).length
+  const nOut = courses.length - nOk
+  const attended = withPct.reduce((a, c) => a + c.summary.present, 0)
 
   return (
     <div>
-      <PageHead title="My attendance" sub="Where you stand for the final exam, per course">
-        <Link to="/s/scan" className="btn-dark btn-sm">Scan attendance</Link>
+      <PageHead title="My attendance" sub={`Where ${user.name.split(' ')[0]} stands for the final exam, per course`}>
+        <Link to="/scan" className="btn btn-dark btn-sm">Scan attendance</Link>
       </PageHead>
+
+      {courses.length > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="card p-4 text-center">
+            <div className="stat-value">{overall == null ? '—' : overall.toFixed(1) + '%'}</div>
+            <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-stone">Overall</div>
+          </div>
+          <div className="card p-4 text-center">
+            <div className="stat-value text-ok">{nOk}</div>
+            <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-stone">Eligible</div>
+          </div>
+          <div className="card p-4 text-center">
+            <div className={`stat-value ${nOut ? 'text-bad' : ''}`}>{nOut}</div>
+            <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-stone">Not eligible</div>
+          </div>
+          <div className="card p-4 text-center">
+            <div className="stat-value">{attended}</div>
+            <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-stone">Classes attended</div>
+          </div>
+        </div>
+      )}
 
       {courses.length === 0 ? (
         <div className="card">
-          <Empty title="No courses yet"
-            sub="Ask your teacher for a claim code, then sign up on the landing page." />
+          <Empty title="Not enrolled in any course yet"
+            sub="Your teacher adds students to a course roster — then it appears here." />
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {courses.map((c) => (
-            <div key={c.course_id} className="card p-5">
+          {courses.map(({ course, summary: s }) => (
+            <div key={course.id} className="card p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <span className="font-display text-xs font-bold tracking-widest text-slate-400">{c.code}</span>
-                  <h3 className="font-display text-lg font-bold leading-tight">{c.name}</h3>
+                  <span className="text-[10.5px] font-bold uppercase tracking-widest text-bronze">{course.code}</span>
+                  <h3 className="font-display text-lg tracking-wide">{course.name}</h3>
                 </div>
-                <Badge v={c.status} />
+                <Badge v={s.eligible ? 'eligible' : 'not_eligible'} />
               </div>
               <div className="mt-4 flex items-end justify-between">
-                <span className="font-display text-3xl font-bold tracking-tight">
-                  {c.percentage == null ? '—' : c.percentage.toFixed(1) + '%'}
-                </span>
-                <span className="text-[12px] font-semibold text-slate-400">
-                  {c.present} / {c.held} classes · need ≥{c.threshold}%
+                <span className="stat-value">{s.percentage == null ? '—' : s.percentage.toFixed(1) + '%'}</span>
+                <span className="text-[12px] font-semibold text-stone">
+                  {s.present} / {s.held} · need ≥{s.threshold}%
                 </span>
               </div>
-              <div className="mt-2"><Progress pct={c.percentage} status={c.status} /></div>
-              <div className="mt-3 rounded-xl bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-600">
-                {c.status === 'eligible' && (c.can_miss > 0
-                  ? `✓ Buffer: you can miss ${c.can_miss} more class${c.can_miss === 1 ? '' : 'es'} and stay eligible.`
-                  : '✓ Exactly on the line — attend everything from here.')}
-                {c.status === 'at_risk' &&
-                  `⚠ Condonation case. Attend the next ${c.classes_needed} class${c.classes_needed === 1 ? '' : 'es'} in a row to reach ${c.threshold}%.`}
-                {c.status === 'not_eligible' &&
-                  `⛔ Below ${c.threshold - 5}%. Meet your advisor — recovering needs ${c.classes_needed} class${c.classes_needed === 1 ? '' : 'es'} in a row.`}
-                {c.status === 'no_data' && 'No sessions recorded yet.'}
+              <div className="mt-2"><Progress pct={s.percentage} ok={s.eligible} /></div>
+              <div className="mt-3 rounded-xl bg-surface2 px-3.5 py-2.5 text-[13px] font-medium text-stone">
+                {s.percentage == null
+                  ? 'No sessions recorded yet.'
+                  : s.eligible
+                    ? `Eligible — ${s.missedClasses} class${s.missedClasses === 1 ? '' : 'es'} missed so far.`
+                    : `Not eligible — ${s.missedClasses} class${s.missedClasses === 1 ? '' : 'es'} missed, below the ${s.threshold}% line.`}
               </div>
             </div>
           ))}

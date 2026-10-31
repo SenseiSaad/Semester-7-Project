@@ -1,100 +1,102 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api, errMsg } from '../../api'
-import { PageHead, Spinner, Badge, Empty, ArmBtn, copyText } from '../../ui'
+import { useDB, update } from '../../auth'
+import { PageHead, Badge, Empty, ArmBtn } from '../../ui'
+import { setThreshold, addStudentToCourse, getRoster, getSessions, presentCount } from '../../logic/courses.js'
+import { sessionsHeld, courseOf } from '../../logic/eligibility.js'
 
 export default function TCourseDetail() {
   const { id } = useParams()
-  const [data, setData] = useState(null) // {course, roster}
-  const [sessions, setSessions] = useState(null)
-  const [error, setError] = useState('')
-  const [importResult, setImportResult] = useState(null)
-  const [csvText, setCsvText] = useState('')
-  const [file, setFile] = useState(null)
-  const [busy, setBusy] = useState(false)
+  const db = useDB()
+  const course = courseOf(db, id)
+  const [studentForm, setStudentForm] = useState({ name: '', rollNo: '', email: '' })
+  const [formError, setFormError] = useState('')
+  const [thresholdDraft, setThresholdDraft] = useState(null)
+  const [showAdd, setShowAdd] = useState(false)
 
-  function load() {
-    api.get(`/courses/${id}/roster/`).then((r) => setData(r.data)).catch((e) => setError(errMsg(e)))
-    api.get('/sessions/', { params: { course: id } }).then((r) => setSessions(r.data))
-  }
-  useEffect(() => { load() }, [id]) // eslint-disable-line
+  if (!course) return <div className="alert alert-error">Course not found. <Link to="/t/courses">Back to courses.</Link></div>
 
-  async function importRoster(e) {
-    e.preventDefault()
-    setError(''); setBusy(true); setImportResult(null)
-    try {
-      let payload
-      if (file) {
-        const fd = new FormData(); fd.append('file', file); payload = fd
-      } else {
-        payload = { csv: csvText }
-      }
-      const { data } = await api.post(`/courses/${id}/roster/`, payload)
-      setImportResult(data)
-      setCsvText(''); setFile(null)
-      load()
-    } catch (err) { setError(errMsg(err)) } finally { setBusy(false) }
-  }
-
-  async function startSession() {
-    setError('')
-    try {
-      await api.post('/sessions/', { course: Number(id) })
-      load()
-    } catch (err) {
-      setError(errMsg(err)) // e.g. "already has an open session"
-      load()
-    }
-  }
-
-  async function closeSession(sid) {
-    await api.post(`/sessions/${sid}/close/`)
-    load()
-  }
-
-  async function resetDevice(enrollmentId) {
-    await api.post(`/courses/${id}/reset-device/`, { enrollment_id: enrollmentId })
-    load()
-  }
-
-  if (!data || !sessions) return <Spinner />
+  const roster = getRoster(db, id)
+  const sessions = getSessions(db, id)
   const open = sessions.find((s) => s.status === 'open')
+
+  function saveThreshold() {
+    update((d) => {
+      const res = setThreshold(d, id, thresholdDraft)
+      if (!res.ok) setFormError(res.error)
+      else setFormError('')
+    })
+    setThresholdDraft(null)
+  }
+
+  function startSession() {
+    update((d) => {
+      // one open session per course at a time
+      if (d.sessions.some((s) => s.courseId === id && s.status === 'open')) return
+      const today = new Date().toISOString().slice(0, 10)
+      d.sessions.push({ id: `s_${Date.now().toString(36)}`, courseId: id, date: today, status: 'open' })
+    })
+  }
+
+  function closeSession(sid) { update((d) => { const s = d.sessions.find((x) => x.id === sid); if (s) s.status = 'closed' }) }
+
+  function addStudent(e) {
+    e.preventDefault()
+    setFormError('')
+    update((d) => {
+      const res = addStudentToCourse(d, { courseId: id, ...studentForm, email: studentForm.email || `${studentForm.rollNo.toLowerCase()}@uni.edu` })
+      if (res.ok) setStudentForm({ name: '', rollNo: '', email: '' })
+      else setFormError(res.error)
+    })
+  }
 
   return (
     <div>
-      <PageHead title={`${data.course.code} — ${data.course.name}`}
-        sub={`${data.roster.length} on roster · threshold ≥${data.course.eligibility_threshold}%`}>
-        <Link to={`/t/eligibility?course=${id}`} className="btn-ghost btn-sm">Eligibility report</Link>
+      <PageHead title={`${course.code} — ${course.name}`}
+        sub={`${roster.length} students · ${sessionsHeld(db, id)} sessions held · planned ${course.totalClasses}`}>
+        <Link to={`/t/eligibility?course=${id}`} className="btn btn-ghost btn-sm">Eligibility report</Link>
         {open ? (
-          <Link to={`/t/sessions/${open.id}`} className="btn-dark btn-sm">Open QR screen ({open.present_count}/{open.enrolled_count})</Link>
+          <Link to={`/t/sessions/${open.id}`} className="btn btn-dark btn-sm">Open session ({presentCount(db, open.id)}/{roster.length})</Link>
         ) : (
-          <button className="btn-dark btn-sm" onClick={startSession}>Start session</button>
+          <button className="btn btn-dark btn-sm" onClick={startSession}>Start session</button>
         )}
       </PageHead>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {/* threshold editor — statuses recompute instantly on save */}
+      <div className="card mb-6 p-5">
+        <h3 className="font-display text-lg tracking-wide">Eligibility rule</h3>
+        <p className="mt-1 text-[13px] text-stone">A student is eligible when their percentage is at or above this number. Changing it reclassifies everyone immediately.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold">Eligible at</span>
+          <input className="input !w-24 text-center" type="number" min="1" max="99"
+            value={thresholdDraft ?? course.eligibilityThreshold}
+            onChange={(e) => setThresholdDraft(e.target.value)} />
+          <span className="text-sm font-semibold">% or more</span>
+          <button className="btn btn-dark btn-sm" disabled={thresholdDraft == null} onClick={saveThreshold}>Apply</button>
+          {formError && <span className="text-[13px] font-semibold text-bad">{formError}</span>}
+        </div>
+      </div>
 
       {/* sessions */}
       <div className="card mb-6">
-        <div className="flex items-center justify-between px-5 pt-4">
-          <h3 className="font-display font-bold">Sessions ({sessions.length})</h3>
-          <span className="text-xs text-slate-400">Open sessions appear on your dashboard</span>
-        </div>
+        <div className="px-5 pt-4"><h3 className="font-display text-lg tracking-wide">Sessions ({sessions.length})</h3></div>
         <div className="mt-2 overflow-x-auto">
           <table className="table">
             <thead><tr><th>Date</th><th>Status</th><th>Present</th><th></th></tr></thead>
             <tbody>
-              {sessions.slice(0, 8).map((s) => (
+              {sessions.slice(0, 10).map((s) => (
                 <tr key={s.id}>
                   <td className="font-semibold">{s.date}</td>
                   <td><Badge v={s.status} /></td>
-                  <td className="font-semibold">{s.present_count} / {s.enrolled_count}</td>
+                  <td className="font-semibold">{presentCount(db, s.id)} / {roster.length}</td>
                   <td className="text-right">
-                    {s.status === 'open' && (
+                    {s.status === 'open' ? (
                       <>
-                        <Link className="btn-ghost btn-sm" to={`/t/sessions/${s.id}`}>QR screen</Link>
-                        <ArmBtn onConfirm={() => closeSession(s.id)}>Close session</ArmBtn>
+                        <Link className="btn btn-ghost btn-sm" to={`/t/sessions/${s.id}`}>Session screen</Link>
+                        <ArmBtn onConfirm={() => closeSession(s.id)}>Close</ArmBtn>
                       </>
+                    ) : (
+                      <Link className="btn btn-ghost btn-sm" to={`/t/manual?session=${s.id}`}>Records</Link>
                     )}
                   </td>
                 </tr>
@@ -102,81 +104,44 @@ export default function TCourseDetail() {
             </tbody>
           </table>
         </div>
-        {sessions.length === 0 && <Empty title="No sessions yet" sub="Start one to show the QR." />}
+        {sessions.length === 0 && <Empty title="No sessions yet" sub="Start one to show the join QR." />}
       </div>
 
       {/* roster */}
       <div className="card mb-6">
-        <div className="px-5 pt-4"><h3 className="font-display font-bold">Roster &amp; claim codes</h3></div>
+        <div className="flex items-center justify-between px-5 pt-4">
+          <h3 className="font-display text-lg tracking-wide">Roster ({roster.length})</h3>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowAdd(!showAdd)}>Add student</button>
+        </div>
+        {showAdd && (
+          <form onSubmit={addStudent} className="mx-5 mt-4 grid gap-3 rounded-2xl border border-line bg-surface2 p-4 md:grid-cols-[1fr_1fr_1fr_auto]">
+            <input className="input" required placeholder="Full name" value={studentForm.name}
+              onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })} />
+            <input className="input" required placeholder="Roll no (2022-CS-011)" value={studentForm.rollNo}
+              onChange={(e) => setStudentForm({ ...studentForm, rollNo: e.target.value })} />
+            <input className="input" placeholder="Email (optional)" value={studentForm.email}
+              onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
+            <button className="btn btn-dark btn-sm">Add to roster</button>
+            {formError && <div className="text-[13px] font-semibold text-bad md:col-span-4">{formError}</div>}
+            <p className="text-[12px] text-stone md:col-span-4">A student account is created with the default password <b>study1234</b> — share it with the student.</p>
+          </form>
+        )}
         <div className="mt-2 overflow-x-auto">
           <table className="table">
-            <thead><tr><th>Student ID</th><th>Name</th><th>Status</th><th>Claim code</th><th>Device</th><th></th></tr></thead>
+            <thead><tr><th>Roll no</th><th>Name</th><th>Email</th><th></th></tr></thead>
             <tbody>
-              {data.roster.map((r) => (
-                <tr key={r.id}>
-                  <td className="font-mono text-[13px] font-semibold">{r.student_id}</td>
-                  <td>{r.name}</td>
-                  <td><Badge v={r.claimed ? 'claimed' : 'unclaimed'} /></td>
-                  <td>
-                    {r.claimed
-                      ? <span className="text-slate-300">—</span>
-                      : <button className="font-mono text-[13px] font-bold text-ink underline underline-offset-2"
-                          onClick={() => copyText(r.claim_code)} title="Click to copy">
-                          {r.claim_code}
-                        </button>}
-                  </td>
-                  <td>{r.claimed ? (r.has_device ? '📱 registered' : <span className="text-slate-300">none</span>) : '—'}</td>
-                  <td className="text-right">
-                    {r.claimed && r.has_device &&
-                      <ArmBtn onConfirm={() => resetDevice(r.id)}>Reset device</ArmBtn>}
-                  </td>
+              {roster.map((u) => (
+                <tr key={u.id}>
+                  <td className="font-mono text-[13px] font-semibold">{u.rollNo}</td>
+                  <td>{u.name}</td>
+                  <td className="text-stone">{u.email}</td>
+                  <td className="text-right text-[12px] text-stone">password: study1234</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {data.roster.length === 0 && <Empty title="Empty roster" sub="Import a CSV below." />}
-      </div>
-
-      {/* import */}
-      <div className="card p-5">
-        <h3 className="font-display font-bold">Import roster CSV</h3>
-        <p className="mt-1 text-[13px] text-slate-400">
-          Columns: <code className="font-mono font-semibold">student_id,name</code> — a unique claim code is generated per row.
-        </p>
-        <form onSubmit={importRoster} className="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <label className="label">CSV file</label>
-            <input type="file" accept=".csv,text/csv" className="input !py-2"
-              onChange={(e) => setFile(e.target.files[0] || null)} />
-            <div className="my-2 text-center text-xs font-semibold text-slate-300">or paste</div>
-            <textarea className="input font-mono text-[13px]" rows="4" placeholder={'2022-CS-011,Imran Qureshi\n2022-CS-012,Kamran Shah'}
-              value={csvText} onChange={(e) => setCsvText(e.target.value)} />
-          </div>
-          <div>
-            <button className="btn-dark" disabled={busy || (!file && !csvText.trim())}>
-              {busy ? 'Importing…' : 'Import'}
-            </button>
-            {importResult && (
-              <div className="mt-4 rounded-xl border border-slate-200 p-3 text-[13px]">
-                <b className="text-emerald-600">{importResult.created.length} created</b>
-                {importResult.created.length > 0 && (
-                  <ul className="mt-1 space-y-0.5 font-mono text-[12px]">
-                    {importResult.created.map((c) => (
-                      <li key={c.id}>{c.student_id} → <b>{c.claim_code}</b></li>
-                    ))}
-                  </ul>
-                )}
-                {importResult.skipped.length > 0 && (
-                  <div className="mt-2 text-amber-600">
-                    <b>{importResult.skipped.length} skipped:</b>{' '}
-                    {importResult.skipped.map((s) => `row ${s.row} (${s.reason})`).join('; ')}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </form>
+        {roster.length === 0 && <Empty title="Empty roster" sub="Add students above." />}
       </div>
     </div>
   )

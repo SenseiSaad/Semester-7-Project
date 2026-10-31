@@ -1,108 +1,145 @@
 # AttendWise — Student Attendance & Exam Eligibility System
 
-QR-based attendance with anti-cheating guarantees and live exam-eligibility tracking.
-**Stack:** Django 4 + Django REST Framework + SimpleJWT (SQLite in dev, PostgreSQL-ready) ·
-React (Vite) + Tailwind + axios + react-router + qrcode.react.
+A complete, standalone attendance and exam-eligibility portal built as a single
+React application. The "backend" is a set of pure JavaScript modules inside the
+app, so the whole project deploys to **Vercel as static files** — no server to
+run, no database to provision. All data lives in the browser's localStorage and
+every business rule is unit-tested.
 
-```
-attendance-system/
-├── backend/                  Django project
-│   ├── manage.py
-│   ├── server/               settings/urls (SQLite, CORS for Vite)
-│   └── attendance/           models · services · views · permissions · tests · seed_demo
-├── frontend/                 React app (Vite + Tailwind)
-│   └── src/
-│       ├── pages/Landing.jsx · Login.jsx · Signup.jsx · Attend.jsx (scan)
-│       ├── pages/teacher/    dashboard · courses · roster/QR-session · manual editor · violations · eligibility
-│       └── pages/student/    dashboard · history · notifications (+ shared scan page)
-└── test_backbencher.py       47-check adversarial API test (run against live servers)
-```
+**Live sections:** landing page (what it is · student portal · teacher
+authority · violations & effects · terms & conditions) → role-based login →
+teacher or student portal.
 
-## Setup (dev)
+---
+
+## Quick start
 
 ```bash
-# 1. backend
-cd backend
-python3 -m venv ../.venv && source ../.venv/bin/activate     # Windows: ..\.venv\Scripts\activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py seed_demo          # demo teacher, 3 courses, roster, history, 1 live session
-python manage.py runserver 127.0.0.1:8000
-
-# 2. frontend (new terminal)
 cd frontend
 npm install
-npm run dev                         # http://127.0.0.1:5173
+npm run dev        # http://127.0.0.1:5173
+npm test           # 24 unit tests (vitest)
+npm run build      # production build → dist/
 ```
 
-**Demo logins** (also printed by `seed_demo`):
+## Deploy to Vercel
 
-| role    | login                | password  |
-|---------|----------------------|-----------|
-| teacher | teacher@uni.edu      | teach1234 |
-| student | 2022-cs-001@uni.edu … 2022-cs-008@uni.edu | study1234 |
+1. Push the project to GitHub and import it at vercel.com.
+2. Root directory: `frontend` · Framework preset: **Vite** (auto-detected).
+3. Deploy. `vercel.json` rewrites all routes to `index.html` for the router,
+   and seed data is created on first load — the deployed app works immediately.
 
-Unclaimed roster rows (for testing **signup**) are printed by `seed_demo`, e.g.
-`CS-301: id=2022-CS-009 code=<8-char claim code>`.
+## Demo accounts
 
-## Roles & what they see
+| Role | Email | Password |
+|------|-------|----------|
+| Teacher (admin) | `teacher@uni.edu` | `teach1234` |
+| Students | `2022-cs-001@uni.edu` … `2022-cs-008@uni.edu` | `study1234` |
 
-| | Logged out | Teacher | Student |
-|---|---|---|---|
-| Landing + login/signup | ✅ | ✅ | ✅ |
-| `/t/*` dashboard, courses+roster, QR session screen, manual editor, violations, eligibility+CSV | ❌ | ✅ | ❌ (403 at the API too) |
-| `/s/*` per-course %, history, scan page, alerts | ❌ | ❌ | ✅ |
-| `/attend?c=CODE` (QR target) | → redirects to login, preserves code | shows "teachers don't scan" | marks attendance |
+Students 007 and 008 sit below the eligibility line. The CS-301 session is
+open from first load — log in as a student and scan.
 
-## How the QR anti-spoofing works
+---
 
-- Teacher opens a session → server creates a random per-session **secret**.
-- `GET /api/sessions/{id}/qr/` returns `code = "<session_id>.<rotation_ts>.<HMAC-SHA256(secret, "id:ts")[:32]>"`,
-  with `rotation_ts` floored to a **20 s window**. The teacher screen re-polls every 5 s and shows a countdown.
-- The QR encodes `{frontend}/attend?c=CODE` — phone camera → app → login if needed → auto-submit.
-- `POST /api/attendance/scan/` validation order (matters):
-  1. HMAC verifies → else **reject** (`invalid`, no violation)
-  2. rotation within current + 1 grace window → else **reject** (`expired`, no violation — the honest "I photographed the QR too late" case)
-  3. session open → enrolled → else reject (no violation)
-  4. **device checks → these create violations**: token must match the student's single registered device
-     (`unregistered_device`); a token already used by *another account in the same session* → `device_shared`
-  5. optional per-session **campus-IP check** (`CAMPUS_IP_PREFIXES` in settings)
-  6. already marked → `already_marked` (**no penalty**, idempotent)
-- Every violation is logged, **warns the student in-app**, and the **2nd violation in a course notifies the instructor**.
-- Teacher manual edits require a **reason** and stamp `edited_by` (audit); closed sessions freeze their records.
-- Teacher can **reset** a student's device (lost phone) from the roster.
+## What each role can do
 
-## Eligibility rule
+### Student portal
+| Page | Functionality |
+|------|---------------|
+| **Dashboard** | Overall percentage; per-course card with percentage, progress bar against that course's threshold, missed-class count, eligible / not-eligible verdict. Recomputes the moment anything changes. |
+| **Scan** | Lists open sessions for enrolled courses. One tap spends the student's unique one-time QR token and marks present. A second attempt marks nothing and logs a violation. |
+| **History** | Every attendance record: date, course, status, and the method that produced it (QR token / CSV / manual). |
+| **Alerts** | The student's violation record — warnings and escalations, each with a plain-language explanation. |
 
-`percentage = present / sessions_held × 100` (every created session counts as held; close sessions you didn't hold).
+### Teacher (admin) — full authority
+| Functionality | What it does |
+|------|---------------|
+| **Courses & thresholds** | Create courses; each sets its own eligibility threshold (1–99). Changing it reclassifies every student instantly. |
+| **Rosters & accounts** | Add students to a course — the app creates their sign-in. |
+| **Sessions** | Open a session (a join QR appears; one token is issued per enrolled student) and close it when class ends. |
+| **Manual checklist** | Toggle present/absent per student and save — one record per student per session, always. |
+| **CSV upload** | Parse `rollNo,status` rows. Every row is validated: unknown students are skipped with a reason, invalid statuses are reported, duplicates for the same session are blocked. |
+| **QR tokens** | One unique token per student per session. First scan spends it; a second scan logs a violation instead of a mark. |
+| **Manual editor + admin override** | Correct any record. Closed sessions are frozen for students; the teacher can edit them only behind an explicit override. |
+| **Violations log** | Every duplicate-QR attempt, split into *escalated* and *warnings (not escalated)*, filterable by course and type. |
+| **Eligibility report** | Filterable, searchable list with present/held, percentage, missed classes and verdicts; one-click CSV export (formula-injection safe). |
 
-| status | condition | student sees |
-|---|---|---|
-| Eligible | pct ≥ threshold (default 75) | buffer: "can miss N more classes" |
-| At risk | pct ≥ threshold − 5 | condonation case + "attend N in a row" |
-| Not eligible | below | detained + recovery plan |
+### Violations & their effects
+A violation is a rejected attempt to reuse an already-spent session QR token.
+The scan never double-counts; the attempt is logged with student, course,
+session and timestamp. Effects depend on standing:
 
-`threshold` is per-course (1–99). Math is unit-tested including "exactly 75% = eligible" and "69.9% = not eligible".
+- **Warning (private)** — first violation in a course by a student who is
+  currently *eligible* in it. Visible only in the student's own Alerts and in
+  a separate, clearly-marked "not escalated" section of the teacher's log.
+- **Escalated** — a repeat violation in the same course, or any violation by a
+  student below that course's threshold. Appears directly in the
+  instructor's violations log.
 
-## Testing
+The full policy ships on the landing page under **Terms & conditions** and is
+enforced in code (`src/logic/policy.js`), not just in copy.
 
-```bash
-# backend unit/integration tests (45): scan validation, eligibility, permissions, roster, audit
-cd backend && python manage.py test
+---
 
-# adversarial suite (47 checks) — start both servers first, then:
-python test_backbencher.py
+## Architecture
+
+```
+frontend/
+├── vercel.json                  SPA rewrite for client-side routing
+└── src/
+    ├── logic/                   ← the "backend": pure, testable, no UI code
+    │   ├── storage.js           swappable persistence driver (localStorage / memory)
+    │   ├── seed.js              demo data + demo-grade password hash
+    │   ├── auth.js              login by role, session persistence, route-guard helpers
+    │   ├── eligibility.js       percentage, verdicts, summaries, CSV export
+    │   ├── attendance.js        marking rules, duplicate prevention, violations
+    │   ├── qr.js                one-time token generation & redemption
+    │   ├── csv.js               parse + validate attendance CSV
+    │   ├── courses.js           course / roster / session management
+    │   ├── policy.js            good-standing warning vs escalation
+    │   └── __tests__/           24 unit tests (vitest)
+    ├── pages/                   React screens (talk only to logic/)
+    ├── ThemeToggle.jsx          light / dark switch
+    └── index.css                design tokens as CSS variables (light + dark)
 ```
 
-The adversarial suite plays "Kamran", a backbencher who: probes anonymous endpoints, games claim codes,
-steals a classmate's device token, replays a 40-second-old QR, submits forged/fabricated codes, tries
-teacher endpoints with a student JWT, scans a closed session, scans a course he's not enrolled in, and
-tries to edit records without a reason. **All 47 checks pass** — every cheat is rejected, and the two
-device-cheats are flagged as violations with instructor notification.
+**Data model:** `User(role, email, rollNo, passwordHash)` ·
+`Course(eligibilityThreshold, totalClasses)` · `Enrollment` ·
+`Session(status)` · `AttendanceRecord(status, method, timestamp)` ·
+`QRToken(used, usedAt)` · `Violation(type, warning, escalated)`.
 
-## Production notes (out of scope for the demo, listed for honesty)
+**Core rules**
 
-- Set a real `SECRET_KEY`, `DEBUG=False`, PostgreSQL, and HTTPS (the QR link + JWTs should never travel over http).
-- Move the per-session QR secret signing to short-lived tokens if you scale beyond one campus.
-- Device tokens are self-reported by the browser; for stronger guarantees add a fingerprinting lib.
-- `seed_demo` passwords are demo-only; create real users via the admin (`/admin/`) or a management command.
+- `percentage = present / sessions held × 100`; zero sessions held yields
+  `null` with `eligible: false` — no division by zero anywhere.
+- Eligibility: `percentage >= course threshold`. The teacher can change the
+  threshold per course; all statuses recompute instantly.
+- One record per (session, student): a later method **updates** the record
+  rather than adding a new one. CSV imports block duplicates outright.
+- Unenrolled students are rejected by every marking path.
+- Closed sessions reject student writes; the admin can override explicitly.
+
+**Pure output functions** (unit-tested, storage-independent):
+
+```js
+getStudentCourseSummary(db, studentId, courseId)  // {percentage, eligible, missedClasses, …}
+getCourseEligibilityList(db, courseId)            // verdicts for every enrolled student
+getViolations(db, { studentId, courseId, sessionId, type })
+exportEligibilityCSV(db, courseId)                // {filename, text}
+```
+
+## Design
+
+Editorial light/dark theme in the spirit of a premium presentation deck —
+warm charcoal cover, cream surfaces, Marcellus serif display type, hairline
+borders. The palette is defined once as CSS variables and flipped by a
+`.dark` class on `<html>`; the toggle in the navigation persists the choice
+and an inline script applies it before first paint (no flash). Layouts are
+responsive from 320 px phones to wide desktops.
+
+## Honest limitations
+
+Frontend auth guards the UI only: passwords are demo-grade hashed and data
+sits in localStorage, so treat this as a course-project demo, not a production
+system. `_legacy-django/` contains the earlier Django + DRF version for
+reference; the active app no longer uses it.
