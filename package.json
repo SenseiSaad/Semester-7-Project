@@ -1,0 +1,12 @@
+{
+  "name": "semester-7-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AttendWise — Student Attendance & Exam Eligibility System",
+  "scripts": {
+    "dev": "npm --prefix attendance-system run dev",
+    "build": "npm --prefix attendance-system run build",
+    "preview": "npm --prefix attendance-system run preview",
+    "test": "npm --prefix attendance-system test"
+  }
+}

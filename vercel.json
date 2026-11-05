@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm --prefix attendance-system run build",
+  "outputDirectory": "attendance-system/dist",
+  "installCommand": "npm --prefix attendance-system install",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
